@@ -4,40 +4,29 @@
 
 ---
 
-## Agentic Workflow (SF8)
-
-> Document your experience using an AI agent (e.g., Cursor Agent, Claude, Copilot) to make multi-step changes autonomously.
-
-**What task did you give the agent?**
-
-<!-- Describe the goal you asked the agent to accomplish -->
-
-**Prompts used:**
-
-<!-- Paste the key prompts you gave the agent -->
-
-**What did the agent generate or change?**
-
-<!-- List the files edited, code generated, or commands run -->
-
-**What did you verify or fix manually?**
-
-<!-- Describe anything the agent got wrong or that required human review -->
-
----
-
 ## Design Pattern (SF10)
 
 > Document how AI helped you choose or implement a design pattern.
 
 **Which design pattern did you use?**
 
-<!-- e.g., Strategy, Factory, Observer, etc. -->
+Strategy pattern, applied to the song-scoring weights in `score_song`.
 
 **How did AI help you brainstorm or implement it?**
 
-<!-- Describe the conversation or suggestions that led to your decision -->
+I wanted `score_song` to support multiple scoring modes (genre-first, mood-first,
+energy-focused) instead of one fixed set of weights, and asked Claude to plan the
+approach before writing code. It suggested replacing the single `WEIGHTS` dict with
+a `WEIGHT_PRESETS` dict keyed by mode name (each preset still summing to 1.0), and
+initially had `score_song`/`recommend_songs` take a `mode` parameter to select the
+preset. When I said the user profile should decide the mode rather than passing it
+around separately, it moved `mode` onto `user_prefs`/`UserProfile` itself (defaulting
+to `"balanced"`), so `score_song` just reads `user_prefs.get("mode", DEFAULT_MODE)`
+and looks up the matching weight preset — no extra parameter to thread through.
 
 **How does the pattern appear in your final code?**
 
-<!-- Point to the relevant class or method -->
+`WEIGHT_PRESETS` in `src/recommender.py` holds the interchangeable "strategies"
+(`balanced`, `genre_first`, `mood_first`, `energy_focused`), and `score_song`
+(`src/recommender.py`) selects one at runtime based on `user_prefs["mode"]` /
+`UserProfile.mode` to weight the same match calculations differently.

@@ -2,6 +2,8 @@ import csv
 from typing import List, Dict, Tuple, Optional
 from dataclasses import dataclass
 
+DEFAULT_MODE = "balanced"
+
 @dataclass
 class Song:
     """
@@ -29,6 +31,7 @@ class UserProfile:
     favorite_mood: str
     target_energy: float
     likes_acoustic: bool
+    mode: str = DEFAULT_MODE
 
 class Recommender:
     """
@@ -93,14 +96,40 @@ MOOD_TARGETS: Dict[str, Tuple[float, float]] = {
 }
 DEFAULT_MOOD_TARGET: Tuple[float, float] = (0.60, 0.60)
 
-# Algorithm Recipe v2 weights (must sum to 1.0)
-WEIGHTS = {
-    "genre": 0.25,
-    "mood": 0.20,
-    "energy": 0.20,
-    "valence": 0.15,
-    "danceability": 0.10,
-    "acousticness": 0.10,
+# Algorithm Recipe v2 weight presets, one per scoring mode (each must sum to 1.0)
+WEIGHT_PRESETS = {
+    "balanced": {
+        "genre": 0.25,
+        "mood": 0.20,
+        "energy": 0.20,
+        "valence": 0.15,
+        "danceability": 0.10,
+        "acousticness": 0.10,
+    },
+    "genre_first": {
+        "genre": 0.45,
+        "mood": 0.15,
+        "energy": 0.15,
+        "valence": 0.10,
+        "danceability": 0.075,
+        "acousticness": 0.075,
+    },
+    "mood_first": {
+        "genre": 0.15,
+        "mood": 0.40,
+        "energy": 0.10,
+        "valence": 0.20,
+        "danceability": 0.10,
+        "acousticness": 0.05,
+    },
+    "energy_focused": {
+        "genre": 0.10,
+        "mood": 0.10,
+        "energy": 0.40,
+        "valence": 0.15,
+        "danceability": 0.20,
+        "acousticness": 0.05,
+    },
 }
 
 def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
@@ -114,7 +143,17 @@ def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
       - valence / danceability: 1 - abs(song.value - implied target from favorite mood)
       - acousticness: acousticness if likes_acoustic else (1 - acousticness)
       score = 100 * sum(weight_i * match_i)
+
+    user_prefs["mode"] selects which entry of WEIGHT_PRESETS to weight the
+    features by (e.g. "genre_first", "mood_first", "energy_focused");
+    defaults to DEFAULT_MODE ("balanced") when absent.
     """
+    mode = user_prefs.get("mode", DEFAULT_MODE)
+    if mode not in WEIGHT_PRESETS:
+        valid = ", ".join(sorted(WEIGHT_PRESETS))
+        raise ValueError(f"Unknown scoring mode '{mode}'. Valid modes: {valid}")
+    weights = WEIGHT_PRESETS[mode]
+
     favorite_genre = user_prefs.get("genre")
     favorite_mood = user_prefs.get("mood")
     target_energy = user_prefs.get("energy", 0.5)
@@ -140,7 +179,7 @@ def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
         "acousticness": acousticness_match,
     }
 
-    contributions = {feature: WEIGHTS[feature] * match for feature, match in matches.items()}
+    contributions = {feature: weights[feature] * match for feature, match in matches.items()}
     score = round(sum(contributions.values()) * 100, 2)
 
     reason_templates = {
@@ -170,6 +209,8 @@ def recommend_songs(user_prefs: Dict, songs: List[Dict], k: int = 5) -> List[Tup
 
     Scores every song, ranks highest-to-lowest, then applies a diversity cap
     so no artist appears more than MAX_SONGS_PER_ARTIST times in the top k.
+
+    user_prefs["mode"] (see score_song) selects the scoring weight preset.
     """
     scored = sorted(
         ((song, *score_song(user_prefs, song)) for song in songs),
