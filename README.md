@@ -71,12 +71,34 @@ You can add more tests in `tests/test_recommender.py`.
 Paste a sample of your recommender's output here as a text block so a reader can see what it produces:
 
 ```
-# e.g.:
-# User profile: genre=indie, mood=chill, energy=low
-# Recommendations:
-#   1. ...
-#   2. ...
-#   3. ...
+Loaded songs: 20
+
+Top recommendations:
+
++-----+----------------+---------+----------------------------------------------------+
+| #   | Title          | Score   | Reasons                                            |
++=====+================+=========+====================================================+
+| 1   | Sunrise City   | 97.10   | genre 'pop' matches your favorite genre, mood      |
+|     |                |         | 'happy' matches your favorite mood, energy 0.82 is |
+|     |                |         | close to your target 0.80                          |
++-----+----------------+---------+----------------------------------------------------+
+| 2   | Gym Hero       | 75.65   | genre 'pop' matches your favorite genre, energy    |
+|     |                |         | 0.93 is close to your target 0.80, valence 0.77    |
+|     |                |         | fits the 'happy' mood profile                      |
++-----+----------------+---------+----------------------------------------------------+
+| 3   | Rooftop Lights | 70.35   | mood 'happy' matches your favorite mood, energy    |
+|     |                |         | 0.76 is close to your target 0.80, valence 0.81    |
+|     |                |         | fits the 'happy' mood profile                      |
++-----+----------------+---------+----------------------------------------------------+
+| 4   | Neon Horizon   | 51.90   | energy 0.88 is close to your target 0.80, valence  |
+|     |                |         | 0.80 fits the 'happy' mood profile, acousticness   |
+|     |                |         | 0.05 matches your preference for non-acoustic      |
+|     |                |         | tracks                                             |
++-----+----------------+---------+----------------------------------------------------+
+| 5   | Concrete Kings | 50.15   | energy 0.85 is close to your target 0.80, valence  |
+|     |                |         | 0.65 fits the 'happy' mood profile, danceability   |
+|     |                |         | 0.88 fits the 'happy' mood profile                 |
++-----+----------------+---------+----------------------------------------------------+
 ```
 
 **Screenshot or video** *(optional)*: <!-- Insert a screenshot or demo video link here -->
