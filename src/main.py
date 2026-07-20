@@ -70,18 +70,85 @@ def print_recommendations(recommendations) -> None:
         print(separator)
 
 
+USER_PROFILES = {
+    # --- Distinct "normal" taste profiles ---
+    "High-Energy Pop": {
+        "genre": "pop",
+        "mood": "happy",
+        "energy": 0.9,
+        "likes_acoustic": False,
+        "mode": "genre_first",
+    },
+    "Chill Lofi": {
+        "genre": "lofi",
+        "mood": "chill",
+        "energy": 0.35,
+        "likes_acoustic": True,
+        "mode": "mood_first",
+    },
+    "Deep Intense Rock": {
+        "genre": "rock",
+        "mood": "intense",
+        "energy": 0.9,
+        "likes_acoustic": False,
+        "mode": "energy_focused",
+    },
+    # --- Adversarial / edge case profiles ---
+    "Empty Preferences": {},
+    "Nonexistent Genre and Mood": {
+        "genre": "vaporwave-death-polka",
+        "mood": "ecstatic-dread",
+        "energy": 0.5,
+        "likes_acoustic": False,
+    },
+    "Out-of-Range Energy": {
+        "genre": "pop",
+        "mood": "happy",
+        "energy": 5.0,
+        "likes_acoustic": False,
+    },
+    "Negative Energy": {
+        "genre": "metal",
+        "mood": "angry",
+        "energy": -2.0,
+        "likes_acoustic": True,
+    },
+    "Contradictory Acoustic Metal": {
+        "genre": "metal",
+        "mood": "angry",
+        "energy": 0.95,
+        "likes_acoustic": True,
+    },
+    "Invalid Scoring Mode": {
+        "genre": "pop",
+        "mood": "happy",
+        "energy": 0.8,
+        "mode": "vibes_based",
+    },
+}
+
+
+def run_profile(name: str, user_prefs: dict, songs, k: int = 5) -> None:
+    """Print the recommendations (or the error) produced for a single named profile."""
+    print(f"\n=== {name} ===")
+    print(f"user_prefs = {user_prefs}")
+    try:
+        recommendations = recommend_songs(user_prefs, songs, k=k)
+        if not recommendations:
+            print("(no recommendations returned)")
+        else:
+            print_recommendations(recommendations)
+    except Exception as exc:
+        print(f"ERROR: {type(exc).__name__}: {exc}")
+
+
 def main() -> None:
-    """Load songs, generate recommendations for a sample profile, and print them."""
+    """Load songs, generate recommendations for every sample and adversarial profile, and print them."""
     songs = load_songs("data/songs.csv")
     print(f"Loaded songs: {len(songs)}")
 
-    # Starter example profile
-    user_prefs = {"genre": "pop", "mood": "happy", "energy": 0.8}
-
-    recommendations = recommend_songs(user_prefs, songs, k=5)
-
-    print("\nTop recommendations:\n")
-    print_recommendations(recommendations)
+    for name, user_prefs in USER_PROFILES.items():
+        run_profile(name, user_prefs, songs, k=5)
 
 
 if __name__ == "__main__":
