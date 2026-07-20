@@ -70,20 +70,126 @@ def load_songs(csv_path: str) -> List[Dict]:
             songs.append(song)
     return songs
 
+# Mood -> implied (valence_target, danceability_target).
+# Lets score_song reason about valence/danceability even though UserProfile /
+# user_prefs only carry a favorite_mood, not those raw feature values.
+MOOD_TARGETS: Dict[str, Tuple[float, float]] = {
+    "happy": (0.80, 0.80),
+    "chill": (0.55, 0.55),
+    "intense": (0.60, 0.85),
+    "relaxed": (0.65, 0.55),
+    "moody": (0.50, 0.70),
+    "focused": (0.55, 0.55),
+    "energetic": (0.65, 0.85),
+    "peaceful": (0.55, 0.20),
+    "nostalgic": (0.55, 0.40),
+    "angry": (0.30, 0.50),
+    "romantic": (0.70, 0.65),
+    "euphoric": (0.80, 0.90),
+    "warm": (0.70, 0.55),
+    "laid-back": (0.75, 0.70),
+    "melancholic": (0.30, 0.40),
+    "rebellious": (0.55, 0.60),
+}
+DEFAULT_MOOD_TARGET: Tuple[float, float] = (0.60, 0.60)
+
+# Algorithm Recipe v2 weights (must sum to 1.0)
+WEIGHTS = {
+    "genre": 0.25,
+    "mood": 0.20,
+    "energy": 0.20,
+    "valence": 0.15,
+    "danceability": 0.10,
+    "acousticness": 0.10,
+}
+
 def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
     """
     Scores a single song against user preferences.
     Required by recommend_songs() and src/main.py
+
+    Algorithm Recipe v2 (weighted feature distance):
+      - genre / mood: exact match (1.0 or 0.0)
+      - energy: 1 - abs(song.energy - target_energy)
+      - valence / danceability: 1 - abs(song.value - implied target from favorite mood)
+      - acousticness: acousticness if likes_acoustic else (1 - acousticness)
+      score = 100 * sum(weight_i * match_i)
     """
-    # TODO: Implement scoring logic using your Algorithm Recipe from Phase 2.
-    # Expected return format: (score, reasons)
-    return []
+    favorite_genre = user_prefs.get("genre")
+    favorite_mood = user_prefs.get("mood")
+    target_energy = user_prefs.get("energy", 0.5)
+    likes_acoustic = user_prefs.get("likes_acoustic", False)
+
+    valence_target, danceability_target = MOOD_TARGETS.get(favorite_mood, DEFAULT_MOOD_TARGET)
+
+    genre_match = 1.0 if song.get("genre") == favorite_genre else 0.0
+    mood_match = 1.0 if song.get("mood") == favorite_mood else 0.0
+    energy_match = 1.0 - abs(song.get("energy", 0.0) - target_energy)
+    valence_match = 1.0 - abs(song.get("valence", 0.0) - valence_target)
+    danceability_match = 1.0 - abs(song.get("danceability", 0.0) - danceability_target)
+
+    acousticness = song.get("acousticness", 0.0)
+    acousticness_match = acousticness if likes_acoustic else (1.0 - acousticness)
+
+    matches = {
+        "genre": genre_match,
+        "mood": mood_match,
+        "energy": energy_match,
+        "valence": valence_match,
+        "danceability": danceability_match,
+        "acousticness": acousticness_match,
+    }
+
+    contributions = {feature: WEIGHTS[feature] * match for feature, match in matches.items()}
+    score = round(sum(contributions.values()) * 100, 2)
+
+    reason_templates = {
+        "genre": lambda: f"genre '{song.get('genre')}' matches your favorite genre",
+        "mood": lambda: f"mood '{song.get('mood')}' matches your favorite mood",
+        "energy": lambda: f"energy {song.get('energy'):.2f} is close to your target {target_energy:.2f}",
+        "valence": lambda: f"valence {song.get('valence'):.2f} fits the '{favorite_mood}' mood profile",
+        "danceability": lambda: f"danceability {song.get('danceability'):.2f} fits the '{favorite_mood}' mood profile",
+        "acousticness": lambda: (
+            f"acousticness {acousticness:.2f} matches your preference for acoustic tracks"
+            if likes_acoustic
+            else f"acousticness {acousticness:.2f} matches your preference for non-acoustic tracks"
+        ),
+    }
+
+    top_features = sorted(contributions, key=contributions.get, reverse=True)[:3]
+    reasons = [reason_templates[feature]() for feature in top_features if matches[feature] > 0]
+
+    return score, reasons
+
+MAX_SONGS_PER_ARTIST = 2
 
 def recommend_songs(user_prefs: Dict, songs: List[Dict], k: int = 5) -> List[Tuple[Dict, float, str]]:
     """
     Functional implementation of the recommendation logic.
     Required by src/main.py
+
+    Scores every song, ranks highest-to-lowest, then applies a diversity cap
+    so no artist appears more than MAX_SONGS_PER_ARTIST times in the top k.
     """
-    # TODO: Implement scoring and ranking logic
-    # Expected return format: (song_dict, score, explanation)
-    return []
+    scored = sorted(
+        ((song, *score_song(user_prefs, song)) for song in songs),
+        key=lambda scored_song: scored_song[1],
+        reverse=True,
+    )
+
+    artist_counts: Dict[str, int] = {}
+    recommendations: List[Tuple[Dict, float, str]] = []
+
+    for song, score, reasons in scored:
+        if len(recommendations) == k:
+            break
+
+        artist = song.get("artist")
+        if artist_counts.get(artist, 0) >= MAX_SONGS_PER_ARTIST:
+            continue
+
+        explanation = ", ".join(reasons) if reasons else "No strong matches on your preferences"
+        recommendations.append((song, score, explanation))
+        artist_counts[artist] = artist_counts.get(artist, 0) + 1
+
+    return recommendations
