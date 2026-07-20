@@ -2,80 +2,40 @@
 
 ## Project Summary
 
-In this project you will build and explain a small music recommender system.
-
-Your goal is to:
-
-- Represent songs and a user "taste profile" as data
-- Design a scoring rule that turns that data into recommendations
-- Evaluate what your system gets right and wrong
-- Reflect on how this mirrors real world AI recommenders
-
-This version scores a small catalog of songs against a listener's stated taste (genre, mood, energy, and acoustic preference), ranks them, and returns the top matches with a plain-language explanation for each pick. It also caps how many songs from one artist can appear, so the results stay a bit more varied.
+A small content-based music recommender. It scores a catalog of songs against a listener's stated taste (genre, mood, energy, acoustic preference), ranks them, and returns the top matches with a plain-language explanation for each pick. An artist cap (max 2 songs per artist) keeps results varied.
 
 ---
 
 ## How The System Works
 
-Real world recommendation systems are a combination of collaborative filtering, content-based filtering, and as of more recently machine learning and AI.
-Collaborative filtering generates recommendations for a user by using the viewing habits of similar user profiles, hence a 'collaboration' between users.
-Content-based filtering uses the features of the content getting evaluated and compares that information to content that you've previously liked.
-Collaborative filtering is used to 'taste-match' for an individual using other user's profiles while content-based filtering is generally used on newer content.
-Because of the feature-based implementation of this project, this recommender whill be built using content-based filtering.
+Real-world recommenders combine collaborative filtering (recommends based on similar users) and content-based filtering (recommends based on item features compared to what a user already likes). This project uses **content-based filtering**, since it works entirely from song features.
 
-**What features does each `Song` use in your system?**
+### Song features (10 attributes)
 
-Each `Song` carries 10 attributes:
+- `id`, `title`, `artist` — metadata only, not used in scoring
+- `genre`, `mood` — categorical
+- `energy`, `valence`, `danceability`, `acousticness` — floats, 0 to 1
+- `tempo_bpm` — loaded but not used in scoring
 
-- `id`, `title`, `artist` — identifying metadata (used for display and artist deduplication, not scoring)
-- `genre` — categorical (e.g. "pop", "rock")
-- `mood` — categorical (e.g. "happy", "chill")
-- `energy` — float, 0 to 1
-- `tempo_bpm` — float (loaded but not currently used in scoring)
-- `valence` — float, 0 to 1 (musical positivity/happiness)
-- `danceability` — float, 0 to 1
-- `acousticness` — float, 0 to 1
+### UserProfile fields
 
-**What information does your `UserProfile` store?**
+- `favorite_genre` / `favorite_mood` — matched exactly; mood also looks up a target `valence`/`danceability` pair
+- `target_energy` — desired energy level (0 to 1)
+- `likes_acoustic` — flips whether high or low acousticness scores better
+- `mode` — weight preset: `balanced`, `genre_first`, `mood_first`, or `energy_focused`
 
-- `favorite_genre` — preferred genre, matched exactly against a song's genre
-- `favorite_mood` — preferred mood, matched exactly, and also used to look up an implied target `valence`/`danceability` pair via a mood-to-target table
-- `target_energy` — the energy level (0 to 1) the user wants songs to be close to
-- `likes_acoustic` — boolean; flips whether high or low `acousticness` scores well
-- `mode` — selects a weight preset (`balanced`, `genre_first`, `mood_first`, or `energy_focused`) that changes how much each feature counts toward the score
+### Scoring
 
-**How does your `Recommender` compute a score for each song?**
+For each song, five match values are computed and combined using weights from the selected mode (weights sum to 1.0), then scaled to 0–100:
 
-For each song, five match values are computed against the user's profile:
-
-- `genre_match` / `mood_match` — 1.0 for an exact match, 0.0 otherwise
+- `genre_match` / `mood_match` — 1.0 exact match, else 0.0
 - `energy_match` — `1 - abs(song.energy - target_energy)`
-- `valence_match` / `danceability_match` — `1 - abs(song.value - implied_target)`, where the implied target comes from the user's favorite mood
-- `acousticness_match` — the song's acousticness if the user likes acoustic tracks, otherwise `1 - acousticness`
+- `valence_match` / `danceability_match` — `1 - abs(song.value - mood-implied target)`
+- `acousticness_match` — acousticness if user likes acoustic, else `1 - acousticness`
 
-Each match is multiplied by its weight from the selected mode's preset (weights sum to 1.0), summed, and scaled to a 0–100 score. The top three contributing features are turned into a plain-language explanation string.
+Songs are sorted by score, then the top `k` are selected, skipping any song that would push an artist past 2 appearances. Each recommendation includes an explanation built from its top 3 contributing features.
 
-**How do you choose which songs to recommend?**
-
-All songs are scored and sorted highest to lowest. The system then walks down that ranked list and takes the top `k`, but skips any song that would put an artist over a cap of 2 songs in the results — this keeps one artist from dominating the recommendation list even if they have several high-scoring tracks.
-
-### Algorithm Recipe (Final)
-
-- Look up the weight preset for `user_prefs["mode"]` (defaults to `"balanced"` if not set)
-- For each song, compute five match values:
-  - `genre_match` = 1.0 if song genre equals favorite genre, else 0.0
-  - `mood_match` = 1.0 if song mood equals favorite mood, else 0.0
-  - `energy_match` = 1 - |song energy - target energy|
-  - `valence_match` = 1 - |song valence - mood-implied valence target|
-  - `danceability_match` = 1 - |song danceability - mood-implied danceability target|
-  - `acousticness_match` = song acousticness if user likes acoustic, else 1 - acousticness
-- Multiply each match by its weight from the preset and sum them
-- Scale the sum by 100 to get a final score (0–100)
-- Sort all songs by score, highest to lowest
-- Walk down the sorted list and keep the top `k`, skipping any song that would push an artist past 2 appearances
-- Build an explanation string from the top 3 highest-contributing features for each recommended song
-
-**Potential biases:** since genre and mood are scored as strict exact-matches, the system will likely under-recommend songs that are close but not identical to a user's stated preferences (e.g. a "chill" fan may never see "relaxed" songs), reinforcing narrow listening habits rather than encouraging discovery.
+**Known bias:** genre and mood require exact matches, so close-but-different tastes (e.g. "chill" vs. "relaxed") are never surfaced — this narrows discovery rather than encouraging it.
 
 ---
 
@@ -83,40 +43,32 @@ All songs are scored and sorted highest to lowest. The system then walks down th
 
 ### Setup
 
-1. Create a virtual environment (optional but recommended):
-
+1. Create a virtual environment (optional):
    ```bash
    python -m venv .venv
    source .venv/bin/activate      # Mac or Linux
    .venv\Scripts\activate         # Windows
-
-2. Install dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
+   ```
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
 3. Run the app:
-
-```bash
-python -m src.main
-```
+   ```bash
+   python -m src.main
+   ```
 
 ### Running Tests
-
-Run the starter tests with:
 
 ```bash
 pytest
 ```
 
-You can add more tests in `tests/test_recommender.py`.
+Add more tests in `tests/test_recommender.py`.
 
 ---
 
 ## Sample Recommendation Output
-
-Paste a sample of your recommender's output here as a text block so a reader can see what it produces:
 
 ```
 Loaded songs: 20
@@ -149,17 +101,15 @@ Top recommendations:
 +-----+----------------+---------+----------------------------------------------------+
 ```
 
-**Screenshot or video** *(optional)*: <!-- Insert a screenshot or demo video link here -->
-
 ---
 
 ## Experiments You Tried
 
-I defined a set of `USER_PROFILES` in [src/main.py](src/main.py) — three distinct "normal" taste profiles plus five adversarial/edge-case profiles — and ran every one of them through `recommend_songs` against the sample catalog.
+`src/main.py` defines `USER_PROFILES` — three normal taste profiles and five adversarial/edge-case profiles — all run through `recommend_songs` against the sample catalog.
 
-### Normal taste profiles
+### Normal profiles
 
-**High-Energy Pop** (`genre_first` mode, target energy 0.9) correctly surfaced the two `pop` songs first, with `Sunrise City` and `Gym Hero` far outscoring everything else thanks to the genre weight being boosted to 0.45.
+- **High-Energy Pop** (`genre_first`, target energy 0.9): correctly ranked both `pop` songs first, since the boosted genre weight (0.45) dominated.
 
 ```
 === High-Energy Pop ===
@@ -190,7 +140,7 @@ user_prefs = {'genre': 'pop', 'mood': 'happy', 'energy': 0.9, 'likes_acoustic': 
 +-----+----------------+---------+----------------------------------------------------+
 ```
 
-**Chill Lofi** (`mood_first` mode, likes acoustic, target energy 0.35) put both `lofi` tracks at the top, with the mood/valence weighting from `mood_first` pulling `Spacewalk Thoughts` (ambient, but very "chill"-coded) above unrelated genres.
+- **Chill Lofi** (`mood_first`, likes acoustic, target energy 0.35): both `lofi` tracks ranked highest; mood/valence weighting pulled a thematically-similar ambient track above unrelated genres.
 
 ```
 === Chill Lofi ===
@@ -220,7 +170,7 @@ user_prefs = {'genre': 'lofi', 'mood': 'chill', 'energy': 0.35, 'likes_acoustic'
 +-----+--------------------+---------+----------------------------------------------------+
 ```
 
-**Deep Intense Rock** (`energy_focused` mode, target energy 0.9) ranked `Storm Runner` (the catalog's only `rock` + `intense` song) first, but because `energy_focused` de-emphasizes genre/mood, several unrelated high-energy tracks (`Gym Hero`, `Concrete Kings`, `Neon Horizon`) crowded into the top 5 purely on energy/danceability similarity.
+- **Deep Intense Rock** (`energy_focused`, target energy 0.9): the one true `rock`+`intense` song ranked first, but de-emphasized genre/mood let several unrelated high-energy tracks crowd the top 5.
 
 ```
 === Deep Intense Rock ===
@@ -252,7 +202,7 @@ user_prefs = {'genre': 'rock', 'mood': 'intense', 'energy': 0.9, 'likes_acoustic
 
 ### Adversarial / edge-case profiles
 
-**Empty Preferences** (`{}` — no genre, mood, energy, or mode at all) didn't crash. Every field fell back to its default (`target_energy=0.5`, `genre=None`, `mood=None` → the `DEFAULT_MOOD_TARGET` of `(0.60, 0.60)`), so the system quietly recommended a generic "middle of the road" playlist instead of refusing or flagging that it had nothing to go on. The explanation text even prints the literal string `'None' mood profile`, leaking an internal implementation detail to the user.
+- **Empty Preferences** (`{}`): didn't crash — every field fell back to a default, producing a generic "middle of the road" playlist with no warning that no real preferences were given. The explanation text even leaked `'None' mood profile` to the user.
 
 ```
 === Empty Preferences ===
@@ -282,7 +232,7 @@ user_prefs = {}
 +-----+-----------------+---------+---------------------------------------------------+
 ```
 
-**Nonexistent Genre and Mood** (made-up strings `"vaporwave-death-polka"` / `"ecstatic-dread"`) produced an almost *identical* ranking to the empty-preferences run, because any mood not in `MOOD_TARGETS` silently falls back to `DEFAULT_MOOD_TARGET` and any genre not in the catalog can never match. The system never tells the user their genre/mood was unrecognized — it just quietly ignores it and still confidently prints an explanation string that repeats their made-up mood back to them (`fits the 'ecstatic-dread' mood profile`), which reads as a false signal that the system "understood" the input.
+- **Nonexistent Genre/Mood** (made-up strings): behaved almost identically to the empty-preferences case, since unrecognized moods silently fall back to a default and unmatched genres just score 0 — but the explanation text confidently echoed the made-up mood back, implying false understanding.
 
 ```
 === Nonexistent Genre and Mood ===
@@ -317,7 +267,7 @@ user_prefs = {'genre': 'vaporwave-death-polka', 'mood': 'ecstatic-dread', 'energ
 +-----+-----------------+---------+---------------------------------------------------+
 ```
 
-**Out-of-Range Energy** (`energy = 5.0`, way outside the documented 0–1 range) broke the scoring math instead of erroring: `energy_match = 1 - abs(song.energy - 5.0)` goes deeply negative for every song, which drags overall scores negative too (`-3.15`, `-13.65`, `-28.90`, `-31.85`). There is no input validation clamping `target_energy` to `[0, 1]`, so a single out-of-range field can flip the sign of the whole score and make "matches" look like penalties.
+- **Out-of-Range Energy** (`energy = 5.0`): broke the scoring math instead of erroring — scores went negative for every song, since nothing clamps `target_energy` to `[0, 1]`.
 
 ```
 === Out-of-Range Energy ===
@@ -350,7 +300,7 @@ user_prefs = {'genre': 'pop', 'mood': 'happy', 'energy': 5.0, 'likes_acoustic': 
 +-----+----------------+---------+----------------------------------------------------+
 ```
 
-**Negative Energy** (`energy = -2.0`) triggers the same unvalidated-range problem from the other direction, and combines badly with `likes_acoustic=True`: the top result `Iron Revolt` only scores 29.65 (it's metal/angry, a "correct" match, but its very low acousticness tanks the acoustic-preference term), while everything else scores close to zero. A confidently-rendered table with all scores near 0–30 gives no visual signal to the user that the input itself was nonsensical.
+- **Negative Energy** (`energy = -2.0`): same unvalidated-range problem; combined with a conflicting acoustic preference, all scores landed near 0 with no visual signal that the input was invalid.
 
 ```
 === Negative Energy ===
@@ -384,7 +334,7 @@ user_prefs = {'genre': 'metal', 'mood': 'angry', 'energy': -2.0, 'likes_acoustic
 +-----+-----------------------+---------+--------------------------------------------------+
 ```
 
-**Contradictory Acoustic Metal** (`genre="metal"`, `mood="angry"`, `likes_acoustic=True` — metal/angry songs in this catalog are almost by definition low-acousticness) is a "can the profile even be satisfied" test rather than a bad-input test. `Iron Revolt` still wins comfortably (88.65) on genre + mood + energy alone, showing the system tolerates an internally-inconsistent-but-valid profile gracefully — the acoustic preference just quietly loses out to the other four weighted terms instead of causing an error or a nonsensical top pick.
+- **Contradictory Acoustic Metal** (metal/angry + likes_acoustic): a valid but hard-to-satisfy profile — the top song still won comfortably on genre/mood/energy alone, with the acoustic term simply outweighed rather than breaking anything.
 
 ```
 === Contradictory Acoustic Metal ===
@@ -414,7 +364,7 @@ user_prefs = {'genre': 'metal', 'mood': 'angry', 'energy': 0.95, 'likes_acoustic
 +-----+--------------------+---------+----------------------------------------------------+
 ```
 
-**Invalid Scoring Mode** (`mode = "vibes_based"`, a mode that doesn't exist in `WEIGHT_PRESETS`) is the one input that the system actually rejects — `score_song` raises a `ValueError` naming the invalid mode and listing the valid options. This is the correct behavior for a fully-invalid categorical input, and it stands in contrast to the silent, no-error fallback behavior for unrecognized genres/moods and out-of-range numeric fields above — the system validates the `mode` string but nothing else.
+- **Invalid Scoring Mode** (`mode = "vibes_based"`): the only input actually rejected — raises a clear `ValueError` listing valid modes.
 
 ```
 === Invalid Scoring Mode ===
@@ -422,21 +372,19 @@ user_prefs = {'genre': 'pop', 'mood': 'happy', 'energy': 0.8, 'mode': 'vibes_bas
 ERROR: ValueError: Unknown scoring mode 'vibes_based'. Valid modes: balanced, energy_focused, genre_first, mood_first
 ```
 
-**Takeaway:** the recommender only validates one input (`mode`) and silently no-ops or produces nonsensical/negative scores for everything else (unknown genre, unknown mood, out-of-range or negative energy). None of these adversarial profiles crashed the recommendation pipeline itself (aside from the intentionally-invalid mode), but several produced misleading confidence — a fully-generic fallback playlist and negative scores presented in the exact same polished table as a legitimate result, with no warning that the input was out of bounds or unrecognized.
+**Takeaway:** the system only validates `mode`. Every other bad input (unknown genre/mood, out-of-range energy) is silently absorbed and still rendered in the same polished, confident table as a legitimate result — this is the main risk area.
 
 ---
 
 ## Limitations and Risks
 
-Summarize some limitations of your recommender.
+- Only validates `mode`; all other invalid input (unknown genre/mood, out-of-range energy) fails silently rather than erroring or warning
+- Exact-match genre/mood scoring narrows discovery and can reinforce a user's existing habits
+- Small, static catalog — no real-world scale or freshness
+- No understanding of lyrics, audio content, or language — purely metadata-driven
+- No handling for conflicting preferences beyond weighted averaging
 
-Examples:
-
-- It only works on a tiny catalog
-- It does not understand lyrics or language
-- It might over favor one genre or mood
-
-You will go deeper on this in your model card.
+See [model_card.md](model_card.md) for a deeper look at bias and fairness.
 
 ---
 
@@ -451,5 +399,4 @@ Write 1 to 2 paragraphs here about what you learned:
 - about how recommenders turn data into predictions
 - about where bias or unfairness could show up in systems like this
 
-
-
+Building this system showed me that a recommender turns data into predictions by comparing labeled item features against stated user preferences, then combining the differences into a single weighted score — no real "understanding" required, just feature engineering and tunable weights. The clearest bias I found came from the data, not the algorithm: because pop was the only genre with two songs in the catalog, a pop fan got a fully on-genre list while every other fan's results were padded with mismatched songs. This showed me that unfairness can stem entirely from an unbalanced dataset, and that the system's silent fallbacks on bad input (blank preferences, made-up genres, out-of-range values) make that bias harder to notice rather than surfacing it.

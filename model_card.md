@@ -2,90 +2,43 @@
 
 ## 1. Model Name  
 
-Give your model a short, descriptive name.  
-Example: **VibeFinder 1.0**  
+**BeatsBlender 1.0**  
 
 ---
 
 ## 2. Intended Use  
 
-Describe what your recommender is designed to do and who it is for. 
-
-Prompts:  
-
-- What kind of recommendations does it generate  
-- What assumptions does it make about the user  
-- Is this for real users or classroom exploration  
+This recommender suggests songs from a small sample catalog based on a listener's stated taste — favorite genre, favorite mood, desired energy level, and whether they like acoustic songs. It assumes the listener can describe their taste in these simple terms, and that their taste stays fairly consistent (it does not learn or adapt over time). This is a classroom exploration project, not a system built for real users or a real music catalog.
 
 ---
 
 ## 3. How the Model Works  
 
-Explain your scoring approach in simple language.  
-
-Prompts:  
-
-- What features of each song are used (genre, energy, mood, etc.)  
-- What user preferences are considered  
-- How does the model turn those into a score  
-- What changes did you make from the starter logic  
-
-Avoid code here. Pretend you are explaining the idea to a friend who does not program.
+Every song has a genre, a mood, an energy level, and a few other traits like how "danceable" or "acoustic" it sounds. The listener tells the system their favorite genre, favorite mood, how much energy they want, and whether they like acoustic songs. The system compares each song to those preferences: exact matches on genre and mood score well, and energy/mood-related traits score well when they're numerically close to what the listener asked for. All of that gets combined into a single score out of 100, and the songs are sorted from best match to worst. I added a setting that lets the listener say which of those traits matters most to them (for example, someone can say genre matters most, or energy matters most), and I added a rule that stops any one artist from taking over the list, so the results feel a bit more varied.
 
 ---
 
 ## 4. Data  
 
-Describe the dataset the model uses.  
-
-Prompts:  
-
-- How many songs are in the catalog  
-- What genres or moods are represented  
-- Did you add or remove data  
-- Are there parts of musical taste missing in the dataset  
+The catalog is a small, made-up list of 20 songs covering genres like pop, lofi, rock, metal, and a few others, each tagged with a mood (like happy, chill, or angry) and numeric traits for energy, valence, danceability, and acousticness. I used the starter dataset as-is without adding or removing songs. Most genres only have one song each — pop is the only genre with two — so the catalog can't really represent the full range of any genre's variety, and things like lyrics, vocal style, or instrumentation aren't captured at all.
 
 ---
 
 ## 5. Strengths  
 
-Where does your system seem to work well  
-
-Prompts:  
-
-- User types for which it gives reasonable results  
-- Any patterns you think your scoring captures correctly  
-- Cases where the recommendations matched your intuition  
+The system works well for listeners with a clear, well-represented taste, like a high-energy pop fan or a chill lofi fan — their top picks are genuinely a good match, and the reasons given for each pick make sense. It also correctly tells apart listeners who want similar energy levels but different moods, for example separating a "happy" high-energy fan from an "intense" high-energy fan even though both want loud, energetic songs. The artist cap also does its job: no single artist crowds out the results, even when they have several high-scoring songs.
 
 ---
 
 ## 6. Limitations and Bias 
 
-Where the system struggles or behaves unfairly. 
-
-Prompts:  
-
-- Features it does not consider  
-- Genres or moods that are underrepresented  
-- Cases where the system overfits to one preference  
-- Ways the scoring might unintentionally favor some users  
+The system does not consider lyrics, vocals, tempo, or anything about the actual sound of a song — only its labeled genre, mood, and a handful of numeric traits. Genre and mood require an exact match, so listeners with tastes close to but not exactly matching a label (e.g. "chill" instead of "relaxed") are never matched well. It also does not validate most inputs, so out-of-range values (like an energy above 1) produce broken, misleading scores instead of an error.
 
 **Finding from experiments:** the system quietly favors pop fans, because pop is the only genre with two songs in our small catalog, while every other genre only has one. That means a pop fan is the only person who can get a results list full of songs that truly match their taste, while a fan of any other genre gets one real match at most, and the rest of their list is filled in with songs from completely different genres that just happen to have a similar mood or energy level. When I tested this by making genre matter a lot more for a rock fan, it only kept that one rock song reliably at the top, and everything after it was a random-feeling mix of other genres rather than music an actual rock fan would want. This is a small example of a filter bubble caused by an unbalanced music collection rather than anything about the listener, and it would be worth fixing by having the system recognize similar genres instead of only rewarding an exact match, so that genres with few songs aren't unfairly overlooked.
 
 ---
 
 ## 7. Evaluation  
-
-How you checked whether the recommender behaved as expected. 
-
-Prompts:  
-
-- Which user profiles you tested  
-- What you looked for in the recommendations  
-- What surprised you  
-- Any simple tests or comparisons you ran  
-
-No need for numeric metrics unless you created some.
 
 I tested nine made-up listeners: three normal ones meant to represent real people (a high-energy pop fan, a chill lofi fan, and a deep intense rock fan) and six "break it if you can" listeners meant to poke at the edges of the system (a completely blank listener with no preferences at all, a listener who typed in a made-up genre and mood, a listener who asked for an energy level way above what's possible, a listener who asked for a negative energy level, a listener who asked for angry metal but also said they like acoustic songs, and a listener who typed in a scoring mode that doesn't exist). For each one I looked at whether the top few picks actually made sense for that kind of listener, and whether the reasons given for each pick lined up with what I'd expect a real person to hear in that song.
 
@@ -101,21 +54,19 @@ The rock fan and the "contradictory acoustic metal" listener (same angry/intense
 
 Ideas for how you would improve the model next.  
 
-Prompts:  
-
-- Additional features or preferences  
-- Better ways to explain recommendations  
-- Improving diversity among the top results  
-- Handling more complex user tastes  
+- Implement a RAG system that could pull songs off of the interent or a some other data source to diversify and increase song data
+- Build more validations checks for user profile input
+- Connect the model to Streamlit to create a interactive user application similar to spotify (data validation would be needed for sure here)
 
 ---
 
 ## 9. Personal Reflection  
 
-A few sentences about your experience.  
+I learnt a lot from the research portion at the beginning of this project about how real recommendation systems function.
 
-Prompts:  
+All though this simple model only used weights and normalized vaues for song features to generate recommendations, it still felt like it was a small scale recommendation engine due to its ability to provide scores and reasoning behind the rankings of songs.
 
-- What you learned about recommender systems  
-- Something unexpected or interesting you discovered  
-- How this changed the way you think about music recommendation apps  
+As I went through this project, I realized that these systems are heavily subjected the discretion of the creator due to the constant decision of features vs tradeoffs. This was definitely a fun project, and I see how ML/AI systems are useful in creating recommendation systems as tech evolves.
+
+Throughout the building process, I used AI to implement code, visual the flow of data across functions and files, and draft various versions of new model functions.
+I felt that I mostly did architectural work and creative design. The AI agent did sometimes need corrections to make the code more 'Pythonic" (modular / concise).
