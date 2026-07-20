@@ -71,6 +71,7 @@ def print_recommendations(recommendations) -> None:
 
 
 def main() -> None:
+    """Load songs, generate recommendations for a sample profile, and print them."""
     songs = load_songs("data/songs.csv")
     print(f"Loaded songs: {len(songs)}")
 
